@@ -1,23 +1,61 @@
 import React from "react";
 import { Box, Text, TextField, Image, Button } from "@skynexui/components";
+import { createClient } from '@supabase/supabase-js'
 import appConfig from "../config.json";
 
-export default function ChatPage() {
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+export default function ChatPage(props) {
   const [ message, setMessage ] = React.useState('');
   const [ messageList, setMessageList ] = React.useState([]);
 
+  React.useEffect(() => {
+    supabaseClient
+      .from('messageList')
+      .select('*')
+      .order('id', { ascending: false })
+      .then(({ data }) => {
+        setMessageList(data);
+      })
+  }, []);
+
   function handleNewMessage(newMessage) {
+    if (newMessage.trim() === '') {
+      return;
+    }
+
     const message = {
-      id: messageList.length + 1,
-      from: 'renancs93',
+      from: 'gabrielcs04',
       text: newMessage,
     }
-    setMessageList([
-      message,
-      ...messageList 
-    ])
+
+    supabaseClient
+      .from('messageList')
+      .insert([message])
+      .then(({ data }) => {
+        setMessageList([
+          data[0],
+          ...messageList 
+        ]);
+      })
+
     setMessage('');
   }
+
+  function handleDeleteMessage(id) {
+    const filterMessageList = messageList.filter((item) => item.id !== id);
+    
+    supabaseClient
+      .from('messageList')
+      .delete()
+      .match({ id: id })
+
+    setMessageList(filterMessageList);
+  }
+
   return (
     <Box
       styleSheet={{
@@ -59,7 +97,7 @@ export default function ChatPage() {
             padding: "16px",
           }}
         >
-          <MessageList messages={messageList} />
+          <MessageList messages={messageList} deleteMessage={handleDeleteMessage} />
 
           <Box
             as="form"
@@ -86,7 +124,7 @@ export default function ChatPage() {
                 border: "0",
                 resize: "none",
                 borderRadius: "5px",
-                padding: "6px 8px",
+                padding: "8px 12px",
                 backgroundColor: appConfig.theme.colors.neutrals[800],
                 marginRight: "12px",
                 color: appConfig.theme.colors.neutrals[200],
@@ -97,8 +135,8 @@ export default function ChatPage() {
               variant="tertiary"
               colorVariant="neutral"
               styleSheet={{
-                marginBottom: '8px',
-                height: "44px",
+                height: "80%",
+                marginBottom: '10px',
               }}
               label={
                 <Image
@@ -109,7 +147,6 @@ export default function ChatPage() {
                 />
               }
             />
-            
           </Box>
         </Box>
       </Box>
@@ -146,7 +183,7 @@ function MessageList(props) {
     <Box
       tag="ul"
       styleSheet={{
-        overflow: "scroll",
+        overflow: "auto",
         display: "flex",
         flexDirection: "column-reverse",
         flex: 1,
@@ -161,7 +198,7 @@ function MessageList(props) {
             tag="li"
             styleSheet={{
               borderRadius: "5px",
-              padding: "6px",
+              padding: "8px",
               marginBottom: "12px",
               hover: {
                 backgroundColor: appConfig.theme.colors.neutrals[700],
@@ -170,30 +207,45 @@ function MessageList(props) {
           >
             <Box
               styleSheet={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 marginBottom: "8px",
               }}
             >
-              <Image
+              <Box
                 styleSheet={{
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "50%",
-                  display: "inline-block",
-                  marginRight: "8px",
+                  display: 'flex',
+                  alignItems: 'center',
                 }}
-                src={`https://github.com/${message.from}.png`}
-              />
-              <Text tag="strong">{message.from}</Text>
-              <Text
-                styleSheet={{
-                  fontSize: "10px",
-                  marginLeft: "8px",
-                  color: appConfig.theme.colors.neutrals[300],
-                }}
-                tag="span"
               >
-                {new Date().toLocaleDateString()}
-              </Text>
+                <Image
+                  styleSheet={{
+                    width: "20px",
+                    height: "20px",
+                    borderRadius: "50%",
+                    display: "inline-block",
+                    marginRight: "8px",
+                  }}
+                  src={`https://github.com/${message.from}.png`}
+                />
+                <Text tag="strong">{message.from}</Text>
+                <Text
+                  styleSheet={{
+                    fontSize: "10px",
+                    marginLeft: "8px",
+                    color: appConfig.theme.colors.neutrals[300],
+                  }}
+                  tag="span"
+                >
+                  {new Date().toLocaleDateString()}
+                </Text>
+              </Box>
+              <Button
+                onClick={() => props.deleteMessage(message.id)}
+                label="Excluir"
+                variant='tertiary'
+              />
             </Box>
             {message.text}
           </Text>
