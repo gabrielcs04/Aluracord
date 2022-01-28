@@ -6,7 +6,7 @@ import appConfig from "../config.json";
 export default function HomePage() {
   const [ username, setUsername ] = React.useState("gabrielcs04");
   const [ size, setSize ] = React.useState(username.length);
-  const route = useRouter();
+  const router = useRouter();
 
   return (
     <>
@@ -41,7 +41,7 @@ export default function HomePage() {
             as="form"
             onSubmit={(event) => {
               event.preventDefault();
-              route.push("/chat");
+              router.push(`/chat?username=${username}`);
             }}
             styleSheet={{
               display: "flex",

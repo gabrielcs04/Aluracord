@@ -1,14 +1,27 @@
 import React from "react";
+import { useRouter } from "next/router";
 import { Box, Text, TextField, Image, Button } from "@skynexui/components";
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 import appConfig from "../config.json";
+import { ButtonSendSticker } from '../src/components/ButtonSendSticker';
 
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+function realTimeMessageListener(addMessage) {
+  return supabaseClient
+    .from('messageList')
+    .on('*', (response) => {
+      addMessage(response);
+    })
+    .subscribe();
+}
+
 export default function ChatPage(props) {
+  const router = useRouter();
+  const currentUser = router.query.username;
   const [ message, setMessage ] = React.useState('');
   const [ messageList, setMessageList ] = React.useState([]);
 
@@ -19,41 +32,51 @@ export default function ChatPage(props) {
       .order('id', { ascending: false })
       .then(({ data }) => {
         setMessageList(data);
-      })
+      });
+    
+    realTimeMessageListener((newMessage) => {
+      if (Object.values(newMessage.new).length === 0) {
+        const id = newMessage.old.id;
+
+        setMessageList((currentValue) => {
+          const filterMessageList = currentValue.filter((item) => item.id !== id);
+          return [
+            ...filterMessageList
+          ]
+        });
+      } else {
+        setMessageList((currentValue) => {
+          return [
+            newMessage.new, 
+            ...currentValue
+          ]
+        });
+      }
+    });
   }, []);
 
   function handleNewMessage(newMessage) {
     if (newMessage.trim() === '') {
       return;
     }
-
-    const message = {
-      from: 'gabrielcs04',
-      text: newMessage,
-    }
+    const message = { from: currentUser, text: newMessage }
 
     supabaseClient
       .from('messageList')
       .insert([message])
-      .then(({ data }) => {
-        setMessageList([
-          data[0],
-          ...messageList 
-        ]);
-      })
+      .then(({ data, error }) => {
+      });
 
     setMessage('');
   }
 
   function handleDeleteMessage(id) {
-    const filterMessageList = messageList.filter((item) => item.id !== id);
-    
     supabaseClient
       .from('messageList')
       .delete()
       .match({ id: id })
-
-    setMessageList(filterMessageList);
+      .then(({ data, error }) => {
+      })
   }
 
   return (
@@ -126,14 +149,21 @@ export default function ChatPage(props) {
                 borderRadius: "5px",
                 padding: "8px 12px",
                 backgroundColor: appConfig.theme.colors.neutrals[800],
-                marginRight: "12px",
+                marginRight: "10px",
                 color: appConfig.theme.colors.neutrals[200],
               }}
             />
+
+            <ButtonSendSticker 
+              onStickerClick={(sticker) => {
+                handleNewMessage(`:sticker: ${sticker}`);
+              }}
+            />
+
             <Button
               onClick={() => {handleNewMessage(message)}}
               variant="tertiary"
-              colorVariant="neutral"
+              colorVariant="light"
               styleSheet={{
                 height: "80%",
                 marginBottom: '10px',
@@ -169,7 +199,7 @@ function Header() {
         <Text variant="heading5">Chat</Text>
         <Button
           variant="tertiary"
-          colorVariant="neutral"
+          colorVariant="light"
           label="Logout"
           href="/"
         />
@@ -238,16 +268,26 @@ function MessageList(props) {
                   }}
                   tag="span"
                 >
-                  {new Date().toLocaleDateString()}
+                  {new Date(message.created_at).toLocaleDateString()}
                 </Text>
               </Box>
               <Button
                 onClick={() => props.deleteMessage(message.id)}
                 label="Excluir"
                 variant='tertiary'
+                colorVariant="negative"
               />
             </Box>
-            {message.text}
+            {message.text.startsWith(':sticker:') ? (
+              <Image 
+                src={message.text.replace(':sticker:', '')} 
+                styleSheet={{
+                  maxWidth: "140px"
+                }}
+              />
+            ) : (
+              message.text
+            )}
           </Text>
         );
       })}
